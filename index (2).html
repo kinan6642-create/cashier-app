@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
+<meta name="app-version" content="4">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>موبايل كاشير</title>
@@ -288,7 +289,7 @@ const Mo=(u,r)=>{const d=D.disp;D.disp=d==='USD'?'SYP':'USD';const t=Mr(u,r);D.d
 const CREDIT='المبرمج محمد رجب حيدان لتصميم البرامج وتطويرها';
 const today=()=>new Date().toISOString().slice(0,10);
 const now=()=>{const d=new Date(),p=n=>String(n).padStart(2,'0');return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+' '+p(d.getHours())+':'+p(d.getMinutes())};
-function toast(m){const t=document.createElement('div');t.className='toast';t.textContent=m;document.body.appendChild(t);setTimeout(()=>t.remove(),1900)}
+function toast(m,ms){const t=document.createElement('div');t.className='toast';t.textContent=m;document.body.appendChild(t);setTimeout(()=>t.remove(),ms||1900)}
 /* ---------- قاعدة بيانات SQLite (sql.js) ---------- */
 const K='mobile-cashier-v1';
 let D={rate:130,store:'',disp:'SYP',products:[],sales:[],sup:[],pur:[],pay:[],nid:1,cb:'$',cl:'ل.س',paper:80,cash:{open:0,show:true,moves:[]}};
@@ -537,12 +538,12 @@ function zxReader(){if(!window.ZXing)return null;
   h.set(Z.DecodeHintType.POSSIBLE_FORMATS,[F.EAN_13,F.EAN_8,F.UPC_A,F.UPC_E,F.CODE_128,F.CODE_39,F.CODE_93,F.ITF,F.CODABAR,F.QR_CODE]);
   h.set(Z.DecodeHintType.TRY_HARDER,true);const r=new Z.MultiFormatReader();r.setHints(h);SC.zx=r}
  return SC.zx}
-function zxDecode(cv){try{const Z=ZXing;return SC.zx.decodeWithState(new Z.BinaryBitmap(new Z.HybridBinarizer(new Z.HTMLCanvasElementLuminanceSource(cv)))).getText()}catch(e){return ''}}
+function zxDecode(cv,g){try{const Z=ZXing,B=g?Z.GlobalHistogramBinarizer:Z.HybridBinarizer;return SC.zx.decodeWithState(new Z.BinaryBitmap(new B(new Z.HTMLCanvasElementLuminanceSource(cv)))).getText()}catch(e){return ''}}
 function scanHtml(mode){const sale=mode==='sale';
  return `<h2>${sale?'مسح للبيع (مسح متواصل)':'مسح للشراء'}</h2>
- <div class="vw"><video id="vd" playsinline muted autoplay></video><div class="frm" id="fr"></div></div>
- <div class="scbar"><button class="chip" id="tb" style="display:none" onclick="torch()">🔦 فلاش</button><button class="chip" id="zb" style="display:none" onclick="zoomCh()">🔍 تقريب ×1</button></div>
- <div id="scs" class="scs">جارٍ فتح الكاميرا…</div>
+ <div class="vw"><video id="vd" playsinline muted autoplay onclick="refocus()"></video><div class="frm" id="fr"></div></div>
+ <div class="scbar"><button class="chip" id="tb" style="display:none" onclick="torch()">🔦 فلاش</button><button class="chip" id="zb" style="display:none" onclick="zoomCh()">🔍 تقريب ×1</button><label class="chip" style="cursor:pointer">📷 صورة<input type="file" accept="image/*" capture="environment" hidden onchange="photoScan(SC.mode,SC.idx==null?-1:SC.idx,this)"></label></div>
+ <div id="scs" class="scs">جارٍ فتح الكاميرا…</div><div id="scd" style="font-size:11px;opacity:.55;text-align:center;direction:ltr"></div>
  ${sale?`<div id="scl"></div><div class="tot"><span>المجموع</span><span id="sct"></span></div><button class="btn full" onclick="scanPay()">إتمام البيع</button><button class="btn alt full" onclick="closeS()">إغلاق (عرض السلة)</button>`
  :`<button class="btn alt full" onclick="stopScan();purDraw()">رجوع للفاتورة</button>`}`}
 function scList(){const l=$('#scl');if(!l)return;
@@ -552,6 +553,7 @@ function scQt(k,d){V.cart[k].qty+=d;if(V.cart[k].qty<=0)V.cart.splice(k,1);scLis
 function scanPay(){if(!V.cart.length)return toast('السلة فارغة');stopScan();V.sheet=null;payS()}
 function scanNewRow(){const l=V.rows[V.rows.length-1];if(!(l&&!l.name&&!l.code))V.rows.push(newRow());startScan('pur',V.rows.length-1)}
 function newFromCode(c){stopScan();prodSheet(0,decodeURIComponent(c))}
+async function refocus(){if(!SC.track)return;try{await SC.track.applyConstraints({advanced:[{focusMode:'single-shot'}]});setTimeout(()=>{SC.track&&SC.track.applyConstraints({advanced:[{focusMode:'continuous'}]}).catch(()=>{})},900)}catch(e){}}
 async function torch(){if(!SC.track)return;try{SC.torch=!SC.torch;await SC.track.applyConstraints({advanced:[{torch:SC.torch}]});$('#tb').classList.toggle('on',SC.torch)}catch(e){SC.torch=false;toast('الفلاش غير مدعوم')}}
 async function zoomCh(){if(!SC.track)return;const z=SC.zoom>=Math.min(3,Math.floor(SC.zmax))?1:SC.zoom+1;try{await SC.track.applyConstraints({advanced:[{zoom:z}]});SC.zoom=z;$('#zb').textContent='🔍 تقريب ×'+z}catch(e){toast('التقريب غير مدعوم')}}
 function noLive(mode,idx,st,vd,insecure,err){
@@ -578,19 +580,20 @@ async function startScan(mode,idx){
  SC.det=null;
  if(window.BarcodeDetector){try{const sup=await BarcodeDetector.getSupportedFormats(),f=BC_FORMATS.filter(x=>sup.includes(x));if(f.length)SC.det=new BarcodeDetector({formats:f})}catch(e){}}
  if(!SC.det&&!zxReader()){$('#scs').textContent='تعذر تحميل مكتبة القراءة';return}
- SC.on=true;$('#scs').textContent='وجّه الباركود إلى منتصف الشاشة';
- const cv=document.createElement('canvas'),cx=cv.getContext('2d',{willReadFrequently:true});let last='',lt=0;
- const loop=async()=>{if(!SC.on)return;
-  try{const v=$('#vd');if(!v){stopScan();return}
-   if(!v.srcObject){v.srcObject=SC.stream;v.play().catch(()=>{})}
-   let code='';
-   if(v.videoWidth){
-    if(SC.det){const r=await SC.det.detect(v);if(r.length)code=r[0].rawValue}
-    else{const W=v.videoWidth,H=v.videoHeight,sx=W*.04,sy=H*.14,sw=W*.92,sh=H*.72,k=Math.min(1,1100/sw);
-     cv.width=Math.round(sw*k);cv.height=Math.round(sh*k);cx.drawImage(v,sx,sy,sw,sh,0,0,cv.width,cv.height);code=zxDecode(cv)}}
-   if(code){const n=Date.now();if(code===last&&n-lt<900)lt=n;else{last=code;lt=n;onCode(SC.mode,SC.idx,code.trim(),$('#scs'))}}
-  }catch(e){if(SC.det&&++SC.err>5&&zxReader())SC.det=null}
-  if(SC.on)SC.t=setTimeout(loop,SC.det?60:90)};
+ SC.on=true;$('#scs').textContent='وجّه الباركود إلى منتصف الشاشة وابتعد 15–25 سم حتى تتضح الصورة';
+ const cv=document.createElement('canvas'),cx=cv.getContext('2d',{willReadFrequently:true});let last='',lt=0,nf=0;
+  const loop=async()=>{if(!SC.on)return;
+   try{const v=$('#vd');if(!v){stopScan();return}
+    if(!v.srcObject){v.srcObject=SC.stream;v.play().catch(()=>{})}
+    let code='';
+    if(v.videoWidth){nf++;
+     if(SC.det){try{const r=await SC.det.detect(v);if(r.length)code=r[0].rawValue}catch(e){if(++SC.err>5&&zxReader())SC.det=null}}
+     if(!code&&SC.on&&zxReader()&&(!SC.det||nf%3===0)){const W=v.videoWidth,H=v.videoHeight,sx=W*.04,sy=H*.14,sw=W*.92,sh=H*.72,k=Math.min(1,1100/sw);
+      cv.width=Math.round(sw*k);cv.height=Math.round(sh*k);cx.drawImage(v,sx,sy,sw,sh,0,0,cv.width,cv.height);code=zxDecode(cv,nf%2===0)}
+     if(nf%8===1){const d=$('#scd');if(d)d.textContent='v2 · '+v.videoWidth+'×'+v.videoHeight+' · '+(SC.det?'native+ZX':'ZX')}}
+    if(code){const n=Date.now();if(code===last&&n-lt<900)lt=n;else{last=code;lt=n;onCode(SC.mode,SC.idx,code.trim(),$('#scs'))}}
+   }catch(e){}
+   if(SC.on)SC.t=setTimeout(loop,SC.det?60:90)};
  loop()}
 const fbUi=(mode,idx,msg)=>`<div>${esc(msg)}</div><label class="btn" style="display:block;margin-top:10px;cursor:pointer;text-align:center">📷 التقاط صورة للباركود<input type="file" accept="image/*" capture="environment" hidden onchange="photoScan('${mode}',${idx??-1},this)"></label>`;
 async function decodeImage(f){
@@ -599,7 +602,7 @@ async function decodeImage(f){
  if(zxReader()){const k=Math.min(1,1600/Math.max(bmp.width,bmp.height)),cv=document.createElement('canvas');cv.width=Math.round(bmp.width*k);cv.height=Math.round(bmp.height*k);
   cv.getContext('2d',{willReadFrequently:true}).drawImage(bmp,0,0,cv.width,cv.height);const t=zxDecode(cv);if(t)return t}
  return ''}
-async function photoScan(mode,idx,el){const f=el.files[0];if(!f)return;const st=$('#scs');st.textContent='جارٍ قراءة الصورة…';
+async function photoScan(mode,idx,el){const f=el.files[0];if(!f)return;stopScan();const st=$('#scs');if(!st)return;st.textContent='جارٍ قراءة الصورة…';
  let code='';try{code=await decodeImage(f)}catch(e){}
  if(!code){st.innerHTML=fbUi(mode,idx,'لم أستطع قراءة الباركود. قرّب الكاميرا قليلاً وتأكد من الإضاءة والوضوح ثم أعد المحاولة.');return}
  onCode(mode,idx,code.trim(),st);
@@ -712,12 +715,21 @@ function renderSet(){return head('الإعدادات')+`<div class="wrap"><label
  <button class="btn alt full" onclick="V.arch=null;archSheet()">🗄 أرشفة البيانات القديمة (للحفاظ على السرعة)</button>${D.sales.length>30000?'<small style="color:var(--red)">عدد الفواتير كبير، يُنصح بالأرشفة قريباً.</small>':''}${snapHtml()}<input id="imp" type="file" hidden onchange="imp(this)">
  <button class="btn alt full" style="color:var(--red)" onclick="sheet('<h2>مسح كل البيانات؟</h2><p>لا يمكن التراجع. انسخ نسخة احتياطية أولاً.</p><button class=&quot;btn red full&quot; onclick=&quot;wipe()&quot;>نعم، امسح</button><button class=&quot;btn alt full&quot; onclick=&quot;closeS()&quot;>تراجع</button>')">مسح كل البيانات</button></div>`}
 const NATIVE=!!(window.Capacitor&&Capacitor.isNativePlatform&&Capacitor.isNativePlatform());
+const NP=(p,m,o)=>Capacitor.nativePromise(p,m,o||{});
 const openExt=u=>{NATIVE?(location.href=u):window.open(u,'_blank')};
-function doPrint(w,h){if(NATIVE){try{Capacitor.registerPlugin('NativePrint').print({w,h}).catch(()=>window.print());return}catch(e){}}window.print()}
+function doPrint(w,h){if(NATIVE){try{NP('NativePrint','print',{w,h}).catch(()=>window.print());return}catch(e){}}window.print()}
 const dl=async(blob,name)=>{
- if(NATIVE){try{const b64=await new Promise((res,rej)=>{const f=new FileReader();f.onload=()=>res(String(f.result).split(',')[1]);f.onerror=rej;f.readAsDataURL(blob)});
-  const r=await Capacitor.registerPlugin('Filesystem').writeFile({path:name,data:b64,directory:'CACHE'});
-  await Capacitor.registerPlugin('Share').share({title:name,url:r.uri,dialogTitle:'حفظ الملف'})}catch(e){toast('تعذر حفظ الملف')}return}
+ if(NATIVE){let step='القراءة';
+  try{const b64=await new Promise((res,rej)=>{const f=new FileReader();f.onload=()=>res(String(f.result).split(',')[1]);f.onerror=rej;f.readAsDataURL(blob)});
+   step='الحفظ';
+   try{await NP('NativeSave','save',{name,data:b64,mime:/\.json$/i.test(name)?'application/json':'application/octet-stream'});toast('✔ حُفظ الملف في مجلد Download: '+name,5000);return}catch(e){}
+   step='الكتابة';
+   const r=await NP('Filesystem','writeFile',{path:name,data:b64,directory:'CACHE'});
+   step='المشاركة';
+   try{await NP('Share','share',{title:name,url:r.uri,dialogTitle:'حفظ الملف'});toast('اختر تطبيقاً لحفظ الملف (Drive، واتساب، ملفات…)',4500)}
+   catch(e){const m=String((e&&e.message)||e);if(/cancel/i.test(m))toast('انتهت المشاركة. إن اخترت تطبيقاً فقد أُرسل الملف إليه',4500);else throw e}
+  }catch(e){toast('تعذر حفظ الملف ('+step+'): '+String((e&&e.message)||e).slice(0,70),6000)}
+  return}
  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),4000)};
 function setCur(k,v){D[k]=v.trim()||(k==='cb'?'$':'ل.س');saveSet()}
 function exp(){persist();markBk();dl(new Blob([DB.export()],{type:'application/vnd.sqlite3'}),'cashier-'+today()+'.sqlite')}
