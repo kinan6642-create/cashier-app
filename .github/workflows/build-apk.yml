@@ -24,10 +24,14 @@ jobs:
         run: |
           set -e
           f=""
-          for x in index.html *.html; do
-            if [ -f "$x" ] && grep -q "NativeSave" "$x"; then f="$x"; break; fi
+          bestv=0
+          for x in *.html; do
+            [ -f "$x" ] || continue
+            v=$(grep -o 'name="app-version" content="[0-9]*"' "$x" | head -n 1 | grep -o '[0-9][0-9]*' || true)
+            if [ -n "$v" ] && [ "$v" -gt "$bestv" ]; then f="$x"; bestv="$v"; fi
           done
-          test -n "$f" || { echo "ERROR: no html file with the latest version was found. Upload the latest index.html"; exit 1; }
+          test -n "$f" || { echo "ERROR: no html file with an app-version was found. Upload the latest index.html"; exit 1; }
+          echo "Selected version: $bestv"
           echo "Using file: $f"
           mkdir -p www native
           cp "$f" www/index.html
