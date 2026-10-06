@@ -288,7 +288,7 @@ const Mo=(u,r)=>{const d=D.disp;D.disp=d==='USD'?'SYP':'USD';const t=Mr(u,r);D.d
 const CREDIT='المبرمج محمد رجب حيدان لتصميم البرامج وتطويرها';
 const today=()=>new Date().toISOString().slice(0,10);
 const now=()=>{const d=new Date(),p=n=>String(n).padStart(2,'0');return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+' '+p(d.getHours())+':'+p(d.getMinutes())};
-function toast(m){const t=document.createElement('div');t.className='toast';t.textContent=m;document.body.appendChild(t);setTimeout(()=>t.remove(),1900)}
+function toast(m,ms){const t=document.createElement('div');t.className='toast';t.textContent=m;document.body.appendChild(t);setTimeout(()=>t.remove(),ms||1900)}
 /* ---------- قاعدة بيانات SQLite (sql.js) ---------- */
 const K='mobile-cashier-v1';
 let D={rate:130,store:'',disp:'SYP',products:[],sales:[],sup:[],pur:[],pay:[],nid:1,cb:'$',cl:'ل.س',paper:80,cash:{open:0,show:true,moves:[]}};
@@ -717,9 +717,17 @@ const NATIVE=!!(window.Capacitor&&Capacitor.isNativePlatform&&Capacitor.isNative
 const openExt=u=>{NATIVE?(location.href=u):window.open(u,'_blank')};
 function doPrint(w,h){if(NATIVE){try{Capacitor.registerPlugin('NativePrint').print({w,h}).catch(()=>window.print());return}catch(e){}}window.print()}
 const dl=async(blob,name)=>{
- if(NATIVE){try{const b64=await new Promise((res,rej)=>{const f=new FileReader();f.onload=()=>res(String(f.result).split(',')[1]);f.onerror=rej;f.readAsDataURL(blob)});
-  const r=await Capacitor.registerPlugin('Filesystem').writeFile({path:name,data:b64,directory:'CACHE'});
-  await Capacitor.registerPlugin('Share').share({title:name,url:r.uri,dialogTitle:'حفظ الملف'})}catch(e){toast('تعذر حفظ الملف')}return}
+ if(NATIVE){let step='القراءة';
+  try{const b64=await new Promise((res,rej)=>{const f=new FileReader();f.onload=()=>res(String(f.result).split(',')[1]);f.onerror=rej;f.readAsDataURL(blob)});
+   step='الحفظ';
+   try{await Capacitor.registerPlugin('NativeSave').save({name,data:b64,mime:/\.json$/i.test(name)?'application/json':'application/octet-stream'});toast('✔ حُفظ الملف في مجلد Download: '+name,5000);return}catch(e){}
+   step='الكتابة';
+   const r=await Capacitor.registerPlugin('Filesystem').writeFile({path:name,data:b64,directory:'CACHE'});
+   step='المشاركة';
+   try{await Capacitor.registerPlugin('Share').share({title:name,url:r.uri,dialogTitle:'حفظ الملف'});toast('اختر تطبيقاً لحفظ الملف (Drive، واتساب، ملفات…)',4500)}
+   catch(e){const m=String((e&&e.message)||e);if(/cancel/i.test(m))toast('انتهت المشاركة. إن اخترت تطبيقاً فقد أُرسل الملف إليه',4500);else throw e}
+  }catch(e){toast('تعذر حفظ الملف ('+step+'): '+String((e&&e.message)||e).slice(0,70),6000)}
+  return}
  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),4000)};
 function setCur(k,v){D[k]=v.trim()||(k==='cb'?'$':'ل.س');saveSet()}
 function exp(){persist();markBk();dl(new Blob([DB.export()],{type:'application/vnd.sqlite3'}),'cashier-'+today()+'.sqlite')}
