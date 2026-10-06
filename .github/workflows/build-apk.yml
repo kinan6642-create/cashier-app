@@ -16,13 +16,19 @@ jobs:
           java-version: 21
       - name: Accept Android licenses
         run: yes | sdkmanager --licenses > /dev/null || true
+      - name: Use fixed signing key
+        run: |
+          mkdir -p ~/.android
+          echo "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" | base64 -d > ~/.android/debug.keystore
       - name: Prepare project
         run: |
           set -e
-          if [ -f index.html ]; then f="index.html"; else f="$(ls -1 *.html 2>/dev/null | head -n 1)"; fi
-          test -n "$f" || { echo "ERROR: no html file found in the repo root"; exit 1; }
+          f=""
+          for x in index.html *.html; do
+            if [ -f "$x" ] && grep -q "refocus" "$x"; then f="$x"; break; fi
+          done
+          test -n "$f" || { echo "ERROR: no html file with the latest version was found. Upload the latest index.html"; exit 1; }
           echo "Using file: $f"
-          grep -q "refundAsk" "$f" || { echo "ERROR: this is an OLD version of the app. Upload the latest index.html"; exit 1; }
           mkdir -p www native
           cp "$f" www/index.html
           cat > www/manifest.webmanifest <<'EOF'
